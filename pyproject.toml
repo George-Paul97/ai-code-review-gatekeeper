@@ -1,0 +1,21 @@
+[project]
+name = "ai-guard"
+version = "0.1.0"
+description = "AI code review gatekeeper (security & quality checks) for PRs"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.5.0"
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "UP", "B", "S"]  # includes security-ish rules (S) via ruff
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
