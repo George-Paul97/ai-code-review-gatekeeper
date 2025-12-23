@@ -7,7 +7,7 @@ from typing import Iterable
 from ai_guard.report.markdown import to_markdown
 from ai_guard.rules import DEFAULT_RULES
 from ai_guard.scanner import scan_paths
-
+import importlib.metadata
 
 def _finding_to_dict(f) -> dict:
     """
@@ -44,12 +44,23 @@ def _finding_to_dict(f) -> dict:
     # include all original keys too (so nothing is lost)
     return {**data, **normalized}
 
+def _get_version() -> str:
+    try:
+        return importlib.metadata.version("ai-guard")
+    except Exception:
+        return "dev"
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="ai-guard",
         description="AI Guard — lightweight code review gatekeeper for security & quality checks.",
     )
+    p.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {_get_version()}",
+    )
+
     sub = p.add_subparsers(dest="command", required=True)
 
     scan = sub.add_parser("scan", help="Scan paths and print a report.")
