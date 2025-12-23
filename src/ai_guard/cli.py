@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
-from pathlib import Path
 from typing import Iterable
 
 from ai_guard.report.markdown import to_markdown
@@ -20,7 +18,6 @@ def _finding_to_dict(f) -> dict:
         data = dict(vars(f))
     except TypeError:
         data = {}
-
     # Normalize common fields if present (helps downstream tools)
     normalized = {}
     for key in ("code", "rule_id", "id"):
@@ -45,8 +42,7 @@ def _finding_to_dict(f) -> dict:
             break
 
     # include all original keys too (so nothing is lost)
-    merged = {**data, **normalized}
-    return merged
+    return {**data, **normalized}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -57,28 +53,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     scan = sub.add_parser("scan", help="Scan paths and print a report.")
-    scan.add_argument(
-        "paths",
-        nargs="*",
-        default=["."],
-        help="Paths to scan (files or directories). Default: current directory.",
-    )
-    scan.add_argument(
-        "--format",
-        choices=["md", "json"],
-        default="md",
-        help="Output format. Default: md",
-    )
-    scan.add_argument(
-        "--include-self",
-        action="store_true",
-        help="Include ai_guard internal sources in scan (off by default).",
-    )
-    scan.add_argument(
-        "--fail-on-findings",
-        action="store_true",
-        help="Exit with code 1 if any findings are found.",
-    )
+    scan.add_argument("paths", nargs="*", default=["."], help="Paths to scan (files or directories).")
+    scan.add_argument("--format", choices=["md", "json"], default="md", help="Output format.")
+    scan.add_argument("--include-self", action="store_true", help="Include ai_guard sources too.")
+    scan.add_argument("--fail-on-findings", action="store_true", help="Exit 1 if findings exist.")
 
     return p
 
@@ -95,22 +73,19 @@ def cmd_scan(paths: Iterable[str], fmt: str, include_self: bool, fail_on_finding
         }
         print(json.dumps(payload, indent=2))
 
-    if fail_on_findings and len(findings) > 0:
-        return 1
-    return 0
+    return 1 if (fail_on_findings and len(findings) > 0) else 0
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
     if args.command == "scan":
-        code = cmd_scan(
+        return cmd_scan(
             paths=args.paths,
             fmt=args.format,
             include_self=args.include_self,
             fail_on_findings=args.fail_on_findings,
         )
-        raise SystemExit(code)
 
-    raise SystemExit(2)
+    return 2
