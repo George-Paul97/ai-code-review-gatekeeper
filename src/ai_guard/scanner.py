@@ -1,54 +1,87 @@
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterable
 
 from ai_guard.rules.base import Finding, Rule
 
-DEFAULT_EXCLUDE_DIRS = {
-    ".git",
-    ".venv",
-    "venv",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    "dist",
-    "build",
-}
+
+def _norm_posix(path_str: str) -> str:
+    s = path_str.replace("\\", "/")
+    if s.startswith("./"):
+        s = s[2:]
+    return s
 
 
-def scan_paths(paths: Iterable[str], rules: list[Rule], include_self: bool = False) -> list[Finding]:
+def _is_excluded(rel_posix: str, exclude: list[str]) -> bool:
+    rp = _norm_posix(rel_posix)
+    p = PurePosixPath(rp)
+
+    for pat in exclude:
+        pat_n = _norm_posix(pat)
+
+        # Treat trailing "/" as "prefix folder"
+        if pat_n.endswith("/"):
+            if rp.startswith(pat_n):
+                return True
+            continue
+
+        # PurePosixPath.match supports ** globs
+        if p.match(pat_n):
+            return True
+
+    return False
+
+
+def scan_paths(
+    paths: Iterable[str],
+    rules: list[Rule],
+    *,
+    include_self: bool = False,
+    exclude: list[str] | None = None,
+) -> list[Finding]:
+    exclude = exclude or []
     findings: list[Finding] = []
+    cwd = Path.cwd()
 
     for p in paths:
         path = Path(p)
 
         if path.is_dir():
             for file in path.rglob("*"):
-                if file.is_file() and not _should_skip(file, include_self=include_self):
-                    findings.extend(_scan_file(file, rules))
+                if not file.is_file():
+                    continue
+
+                # make a stable relative path for matching
+                try:
+                    rel = file.resolve().relative_to(cwd.resolve()).as_posix()
+                except Exception:
+                    rel = file.as_posix()
+                rel = _norm_posix(rel)
+
+                if _is_excluded(rel, exclude):
+                    continue
+
+                if not include_self and rel.startswith("src/ai_guard/"):
+                    continue
+
+                findings.extend(_scan_file(file, rules))
+
         elif path.is_file():
-            if not _should_skip(path, include_self=include_self):
-                findings.extend(_scan_file(path, rules))
+            try:
+                rel = path.resolve().relative_to(cwd.resolve()).as_posix()
+            except Exception:
+                rel = path.as_posix()
+            rel = _norm_posix(rel)
+
+            if _is_excluded(rel, exclude):
+                continue
+
+            if not include_self and rel.startswith("src/ai_guard/"):
+                continue
+            findings.extend(_scan_file(path, rules))
 
     return findings
-
-
-def _should_skip(file: Path, include_self: bool) -> bool:
-    parts = set(file.parts)
-
-    # skip common junk dirs
-    if parts & DEFAULT_EXCLUDE_DIRS:
-        return True
-
-    # avoid scanning this tool's own code by default (prevents self-matching)
-    if not include_self:
-        # matches .../src/ai_guard/...
-        if "src" in parts and "ai_guard" in parts:
-            return True
-
-    return False
 
 
 def _scan_file(file: Path, rules: list[Rule]) -> list[Finding]:

@@ -1,0 +1,13 @@
+# ai-guard.toml
+[scan]
+exclude = [
+  ".venv/",
+  "node_modules/",
+  "dist/",
+  "build/",
+  ".git/",
+  "tests/fixtures/**",
+]
+
+[output]
+default_format = "md"
