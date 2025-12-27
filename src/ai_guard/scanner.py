@@ -5,50 +5,70 @@ from typing import Iterable
 
 from ai_guard.rules.base import Finding, Rule
 
-DEFAULT_EXCLUDE_DIRS = {
-    ".git",
-    ".venv",
-    "venv",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    "dist",
-    "build",
-}
+
+def _normalize_pattern(p: str) -> str:
+    # normalize Windows paths to forward slashes + strip leading ./ and trailing /
+    p = p.replace("\\", "/").strip()
+    if p.startswith("./"):
+        p = p[2:]
+    return p.rstrip("/")
 
 
-def scan_paths(paths: Iterable[str], rules: list[Rule], include_self: bool = False) -> list[Finding]:
+def _is_excluded(file: Path, exclude: list[str]) -> bool:
+    if not exclude:
+        return False
+
+    posix = file.as_posix()
+    for raw in exclude:
+        pat = _normalize_pattern(raw)
+        if not pat:
+            continue
+
+        # Match as a directory segment or prefix anywhere in path.
+        # Examples:
+        #  - ".venv/" excludes ".../.venv/Lib/site-packages/..."
+        #  - "dist/" excludes ".../dist/app.js"
+        if posix.startswith(pat) or f"/{pat}/" in posix or posix.endswith(f"/{pat}"):
+            return True
+
+    return False
+
+
+def scan_paths(
+    paths: Iterable[str],
+    rules: list[Rule],
+    *,
+    include_self: bool = False,
+    exclude: list[str] | None = None,
+) -> list[Finding]:
     findings: list[Finding] = []
+    exclude = exclude or []
 
     for p in paths:
         path = Path(p)
 
         if path.is_dir():
             for file in path.rglob("*"):
-                if file.is_file() and not _should_skip(file, include_self=include_self):
-                    findings.extend(_scan_file(file, rules))
+                if not file.is_file():
+                    continue
+
+                if not include_self and "src/ai_guard" in file.as_posix().replace("\\", "/"):
+                    # skip scanning our own package by default
+                    continue
+
+                if _is_excluded(file, exclude):
+                    continue
+
+                findings.extend(_scan_file(file, rules))
+
         elif path.is_file():
-            if not _should_skip(path, include_self=include_self):
-                findings.extend(_scan_file(path, rules))
+            if not include_self and "src/ai_guard" in path.as_posix().replace("\\", "/"):
+                continue
+            if _is_excluded(path, exclude):
+                continue
+            findings.extend(_scan_file(path, rules))
 
     return findings
-
-
-def _should_skip(file: Path, include_self: bool) -> bool:
-    parts = set(file.parts)
-
-    # skip common junk dirs
-    if parts & DEFAULT_EXCLUDE_DIRS:
-        return True
-
-    # avoid scanning this tool's own code by default (prevents self-matching)
-    if not include_self:
-        # matches .../src/ai_guard/...
-        if "src" in parts and "ai_guard" in parts:
-            return True
-
-    return False
 
 
 def _scan_file(file: Path, rules: list[Rule]) -> list[Finding]:
