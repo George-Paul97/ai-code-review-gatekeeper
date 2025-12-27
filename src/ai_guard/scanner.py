@@ -1,34 +1,33 @@
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterable
 
 from ai_guard.rules.base import Finding, Rule
 
 
-def _normalize_pattern(p: str) -> str:
-    # normalize Windows paths to forward slashes + strip leading ./ and trailing /
-    p = p.replace("\\", "/").strip()
-    if p.startswith("./"):
-        p = p[2:]
-    return p.rstrip("/")
+def _norm_posix(path_str: str) -> str:
+    s = path_str.replace("\\", "/")
+    if s.startswith("./"):
+        s = s[2:]
+    return s
 
 
-def _is_excluded(file: Path, exclude: list[str]) -> bool:
-    if not exclude:
-        return False
+def _is_excluded(rel_posix: str, exclude: list[str]) -> bool:
+    rp = _norm_posix(rel_posix)
+    p = PurePosixPath(rp)
 
-    posix = file.as_posix()
-    for raw in exclude:
-        pat = _normalize_pattern(raw)
-        if not pat:
+    for pat in exclude:
+        pat_n = _norm_posix(pat)
+
+        # Treat trailing "/" as "prefix folder"
+        if pat_n.endswith("/"):
+            if rp.startswith(pat_n):
+                return True
             continue
 
-        # Match as a directory segment or prefix anywhere in path.
-        # Examples:
-        #  - ".venv/" excludes ".../.venv/Lib/site-packages/..."
-        #  - "dist/" excludes ".../dist/app.js"
-        if posix.startswith(pat) or f"/{pat}/" in posix or posix.endswith(f"/{pat}"):
+        # PurePosixPath.match supports ** globs
+        if p.match(pat_n):
             return True
 
     return False
@@ -41,8 +40,9 @@ def scan_paths(
     include_self: bool = False,
     exclude: list[str] | None = None,
 ) -> list[Finding]:
-    findings: list[Finding] = []
     exclude = exclude or []
+    findings: list[Finding] = []
+    cwd = Path.cwd()
 
     for p in paths:
         path = Path(p)
@@ -52,19 +52,32 @@ def scan_paths(
                 if not file.is_file():
                     continue
 
-                if not include_self and "src/ai_guard" in file.as_posix().replace("\\", "/"):
-                    # skip scanning our own package by default
+                # make a stable relative path for matching
+                try:
+                    rel = file.resolve().relative_to(cwd.resolve()).as_posix()
+                except Exception:
+                    rel = file.as_posix()
+                rel = _norm_posix(rel)
+
+                if _is_excluded(rel, exclude):
                     continue
 
-                if _is_excluded(file, exclude):
+                if not include_self and rel.startswith("src/ai_guard/"):
                     continue
 
                 findings.extend(_scan_file(file, rules))
 
         elif path.is_file():
-            if not include_self and "src/ai_guard" in path.as_posix().replace("\\", "/"):
+            try:
+                rel = path.resolve().relative_to(cwd.resolve()).as_posix()
+            except Exception:
+                rel = path.as_posix()
+            rel = _norm_posix(rel)
+
+            if _is_excluded(rel, exclude):
                 continue
-            if _is_excluded(path, exclude):
+
+            if not include_self and rel.startswith("src/ai_guard/"):
                 continue
             findings.extend(_scan_file(path, rules))
 

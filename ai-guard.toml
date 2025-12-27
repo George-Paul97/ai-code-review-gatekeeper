@@ -6,6 +6,7 @@ exclude = [
   "dist/",
   "build/",
   ".git/",
+  "tests/fixtures/**",
 ]
 
 [output]
