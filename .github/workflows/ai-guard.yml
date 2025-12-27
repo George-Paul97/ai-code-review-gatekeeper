@@ -42,7 +42,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${{ steps.changed.outputs.files }}" ]; then
+
+          files_raw="${{ steps.changed.outputs.files }}"
+          if [ -z "$files_raw" ]; then
             echo "No relevant changed files. Skipping scan."
             echo "✅ No relevant changed files to scan." >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -52,13 +54,18 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**Files scanned:**" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "${{ steps.changed.outputs.files }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "$files_raw" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
-          # Run scan; put markdown in job summary
-          ai-guard scan ${{ steps.changed.outputs.files }} --fail-on-findings > ai_guard_report.md || true
-          cat ai_guard_report.md >> "$GITHUB_STEP_SUMMARY"
+          # Build an array from the newline-separated output
+          mapfile -t files <<< "$files_raw"
 
-          # Fail job if findings exist
-          ai-guard scan ${{ steps.changed.outputs.files }} --fail-on-findings
+          # Run once, capture output + exit code
+          set +e
+          ai-guard scan "${files[@]}" --fail-on-findings > ai_guard_report.md
+          status=$?
+          set -e
+
+          cat ai_guard_report.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
