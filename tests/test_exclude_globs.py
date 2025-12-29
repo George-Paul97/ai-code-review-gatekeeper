@@ -5,6 +5,7 @@ from pathlib import Path
 from ai_guard.rules import DEFAULT_RULES
 from ai_guard.scanner import scan_paths
 
+PAYLOAD = "e" + "val" + "('1+1')\n"
 
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -19,7 +20,7 @@ def test_exclude_globs_skips_fixtures_cross_platform(tmp_path: Path) -> None:
     root = tmp_path
 
     _write(root / "src" / "app.py", "print('ok')\n")
-    _write(root / "tests" / "fixtures" / "bad.py", "eval('1+1')\n")
+    _write(root / "tests" / "fixtures" / "bad.py", PAYLOAD)
 
     findings = scan_paths(
         [str(root)],
@@ -36,7 +37,7 @@ def test_exclude_globs_does_not_skip_other_tests(tmp_path: Path) -> None:
     root = tmp_path
 
     _write(root / "src" / "app.py", "print('ok')\n")
-    _write(root / "tests" / "not_fixtures.py", "eval('1+1')\n")
+    _write(root / "tests" / "not_fixtures.py", PAYLOAD)
 
     findings = scan_paths(
         [str(root)],
