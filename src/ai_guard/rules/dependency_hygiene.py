@@ -24,7 +24,10 @@ class DependencyHygieneRule:
                     Finding(
                         rule_id=self.rule_id,
                         title=self.title,
-                        message="Dependency is unpinned; consider pinning versions for reproducible builds.",
+                        message=(
+                            "Dependency is unpinned; consider pinning versions "
+                            "for reproducible builds."
+                        ),
                         severity=Severity.LOW,
                         file_path=file_path,
                         line=idx,

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from ai_guard.rules.base import Finding, Severity
 
 
@@ -14,8 +12,10 @@ class SecretLoggingRule:
 
     def run(self, file_path: str, content: str) -> list[Finding]:
         # apply to common text/code files
-        if not any(file_path.lower().endswith(ext) for ext in (".py", ".js", ".ts", ".php", ".go", ".rb")):
+        extensions = (".py", ".js", ".ts", ".php", ".go", ".rb")
+        if not any(file_path.lower().endswith(ext) for ext in extensions):
             return []
+
 
         findings: list[Finding] = []
         lines = content.splitlines()
@@ -27,7 +27,10 @@ class SecretLoggingRule:
                     Finding(
                         rule_id=self.rule_id,
                         title=self.title,
-                        message="Logging line appears to include secret-related keyword; verify no sensitive data is logged.",
+                        message=(
+                            "Logging line appears to include secret-related keyword; "
+                            "verify no sensitive data is logged."
+                        ),
                         severity=Severity.MEDIUM,
                         file_path=file_path,
                         line=idx,
