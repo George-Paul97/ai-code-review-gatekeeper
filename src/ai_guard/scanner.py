@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
-from typing import Iterable
 
 from ai_guard.rules.base import Finding, Rule
 

@@ -18,7 +18,15 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-select = ["E", "F", "I", "UP", "B", "S"]  # includes security-ish rules (S) via ruff
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S"]
+
+# IMPORTANT: don't run S rules for tests/fixtures and neither S101 in tests
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]              # allow assert in pytest tests
+"tests/fixtures/**" = ["S307"]     # allow eval() in fixtures (intentional)
+
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
