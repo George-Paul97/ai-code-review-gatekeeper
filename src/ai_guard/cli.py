@@ -5,8 +5,8 @@ import importlib.metadata
 import json
 import sys
 import tomllib
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from ai_guard.report.markdown import to_markdown
 from ai_guard.rules import DEFAULT_RULES
@@ -80,7 +80,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     scan = sub.add_parser("scan", help="Scan paths and print a report.")
-    scan.add_argument("paths", nargs="*", default=["."], help="Paths to scan (files or directories).")
+    scan.add_argument(
+        "paths",
+        nargs="*",
+        default=["."],
+        help="Paths to scan (files or directories).",
+    )
+
     scan.add_argument("--format", choices=["md", "json"], default="md", help="Output format.")
     scan.add_argument("--include-self", action="store_true", help="Include ai_guard sources too.")
     scan.add_argument("--fail-on-findings", action="store_true", help="Exit 1 if findings exist.")
@@ -93,7 +99,13 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def cmd_scan(paths: Iterable[str], fmt: str, include_self: bool, fail_on_findings: bool, config_path: str) -> int:
+def cmd_scan(
+    paths: Iterable[str],
+    fmt: str,
+    include_self: bool,
+    fail_on_findings: bool,
+    config_path: str,
+) -> int:
     cfg = load_config(config_path)
 
     try:
