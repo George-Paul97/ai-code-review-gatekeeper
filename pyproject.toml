@@ -5,6 +5,7 @@ description = "AI code review gatekeeper (security & quality checks) for PRs"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
+license = { text = "MIT" }
 
 [project.scripts]
 ai-guard = "ai_guard.cli:main"
